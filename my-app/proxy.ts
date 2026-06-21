@@ -12,7 +12,7 @@ import { NextResponse, type NextRequest } from "next/server";
  * The layout-level protection (layout.tsx files) is the primary source of
  * truth. Middleware adds a fast early redirect layer on top.
  */
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
 
   // Build a Supabase client that can read/write the response cookies.
