@@ -2,7 +2,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { Gallery } from "@/lib/types/gallery";
 
 const GALLERY_COLUMNS =
-  "id, user_id, title, client_name, cover_image_url, created_at";
+  "id, user_id, title, client_name, cover_image_url, created_at, is_public";
 
 /**
  * Fetch all galleries belonging to the currently authenticated user,
@@ -68,6 +68,33 @@ export async function updateGalleryCover(
 
   if (error) {
     console.error("[gallery.service] updateGalleryCover:", error.message);
+    return null;
+  }
+
+  return data;
+}
+
+/**
+ * Toggle the is_public flag on a gallery.
+ * Returns the updated Gallery row, or null on failure.
+ * When is_public = true, the /g/[id] route becomes accessible to anyone with the link.
+ * When is_public = false, the route returns 404 (RLS blocks anon access).
+ */
+export async function setGalleryPublic(
+  galleryId: string,
+  isPublic: boolean
+): Promise<Gallery | null> {
+  const supabase = await createSupabaseServerClient();
+
+  const { data, error } = await supabase
+    .from("galleries")
+    .update({ is_public: isPublic })
+    .eq("id", galleryId)
+    .select(GALLERY_COLUMNS)
+    .single();
+
+  if (error) {
+    console.error("[gallery.service] setGalleryPublic:", error.message);
     return null;
   }
 

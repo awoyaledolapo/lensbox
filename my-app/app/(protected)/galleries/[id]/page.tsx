@@ -4,6 +4,7 @@ import { AppShell, GhostButton } from "@/app/components/AppShell";
 import { getGalleryById } from "@/lib/services/gallery.service";
 import { getAuthUser } from "@/lib/supabase/server";
 import { GalleryDetailClient } from "./GalleryDetailClient";
+import { ShareAccessSection } from "./ShareAccessSection";
 
 // ─── Metadata ─────────────────────────────────────────────────────────────────
 
@@ -79,6 +80,9 @@ export default async function GalleryDetailPage({
 
       {/* Photos section — fully client-side for interactivity */}
       <GalleryDetailClient gallery={gallery} userId={user.id} />
+
+      {/* Share access section */}
+      <ShareAccessSection gallery={gallery} />
 
       {/* Danger zone */}
       <section className="mt-20 border-t border-hairline pt-8">

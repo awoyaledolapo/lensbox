@@ -100,6 +100,21 @@ export function GalleriesClient({ galleries }: { galleries: Gallery[] }) {
             <div className="mt-5">
               <div className="flex items-baseline justify-between gap-4">
                 <h3 className="font-display truncate text-2xl">{g.title}</h3>
+                {/* Access badge */}
+                <span
+                  className={`shrink-0 inline-flex items-center gap-1.5 px-2 py-0.5 text-[10px] font-medium tracking-wide uppercase border ${
+                    g.is_public
+                      ? "border-green-600/30 bg-green-50 text-green-700 dark:bg-green-950/30 dark:text-green-400"
+                      : "border-hairline text-muted-foreground"
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-1.5 w-1.5 rounded-full ${
+                      g.is_public ? "bg-green-500" : "bg-muted-foreground/40"
+                    }`}
+                  />
+                  {g.is_public ? "Link active" : "No access"}
+                </span>
               </div>
               <p className="mt-2 text-sm text-muted-foreground">
                 {g.client_name ?? "No client"} · Created {formatDate(g.created_at)}
