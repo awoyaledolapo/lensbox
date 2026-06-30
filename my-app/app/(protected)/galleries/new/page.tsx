@@ -44,6 +44,62 @@ function Toggle({
   );
 }
 
+// ─── Inline field error ───────────────────────────────────────────────────────
+
+function FieldError({ message }: { message: string | undefined }) {
+  if (!message) return null;
+  return (
+    <p className="mt-1.5 flex items-center gap-1.5 text-xs text-destructive" role="alert">
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden>
+        <circle cx="6" cy="6" r="5.5" stroke="currentColor" />
+        <path d="M6 3.5v3M6 8h.01" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+      </svg>
+      {message}
+    </p>
+  );
+}
+
+// ─── Validation helpers ───────────────────────────────────────────────────────
+
+const TODAY = new Date();
+TODAY.setHours(0, 0, 0, 0);
+
+function validateTitle(v: string): string | undefined {
+  const s = v.trim();
+  if (!s) return "Gallery title is required.";
+  if (s.length < 2) return "Title must be at least 2 characters.";
+  if (s.length > 120) return "Title must be 120 characters or fewer.";
+  return undefined;
+}
+
+function validateClientName(v: string): string | undefined {
+  const s = v.trim();
+  if (s.length > 80) return "Client name must be 80 characters or fewer.";
+  return undefined;
+}
+
+function validateExpires(v: string): string | undefined {
+  if (!v) return undefined; // optional
+  const d = new Date(v);
+  if (isNaN(d.getTime())) return "Enter a valid date.";
+  if (d < TODAY) return "Expiration date must be today or in the future.";
+  return undefined;
+}
+
+function validateNote(v: string): string | undefined {
+  if (v.length > 800) return "Welcome note must be 800 characters or fewer.";
+  return undefined;
+}
+
+function validatePassphrase(v: string, required: boolean): string | undefined {
+  if (!required) return undefined;
+  const s = v.trim();
+  if (!s) return "A passphrase is required when password protection is on.";
+  if (s.length < 4) return "Passphrase must be at least 4 characters.";
+  if (s.length > 128) return "Passphrase must be 128 characters or fewer.";
+  return undefined;
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 type FormStatus =
@@ -52,10 +108,30 @@ type FormStatus =
   | { state: "error"; message: string }
   | { state: "success" };
 
+type FieldErrors = {
+  title?: string;
+  client?: string;
+  expires?: string;
+  note?: string;
+  passphrase?: string;
+};
+
 export default function NewGalleryPage() {
   const [password, setPassword] = useState(false);
   const [downloads, setDownloads] = useState(true);
   const [status, setStatus] = useState<FormStatus>({ state: "idle" });
+
+  // Per-field error messages
+  const [errors, setErrors] = useState<FieldErrors>({});
+  // Track which fields have been touched (blurred) so we only show errors after interaction
+  const [touched, setTouched] = useState<Set<string>>(new Set());
+
+  // Live field values (for character counters and real-time validation on touched fields)
+  const [titleVal, setTitleVal] = useState("");
+  const [clientVal, setClientVal] = useState("");
+  const [expiresVal, setExpiresVal] = useState("");
+  const [noteVal, setNoteVal] = useState("");
+  const [passphraseVal, setPassphraseVal] = useState("");
 
   // Cover image state
   const [coverFile, setCoverFile] = useState<File | null>(null);
@@ -66,13 +142,82 @@ export default function NewGalleryPage() {
   const isLoading = status.state === "loading";
   const isSuccess = status.state === "success";
 
+  // ── Helpers ────────────────────────────────────────────────────────────────
+
+  function touch(field: string) {
+    setTouched((prev) => new Set(prev).add(field));
+  }
+
+  function setError(field: keyof FieldErrors, msg: string | undefined) {
+    setErrors((prev) => ({ ...prev, [field]: msg }));
+  }
+
+  /** Returns the error only if the field has been touched */
+  function visibleError(field: keyof FieldErrors): string | undefined {
+    return touched.has(field) ? errors[field] : undefined;
+  }
+
+  // ── Live validation on change ──────────────────────────────────────────────
+
+  function onTitleChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const v = e.target.value;
+    setTitleVal(v);
+    if (touched.has("title")) setError("title", validateTitle(v));
+  }
+
+  function onClientChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const v = e.target.value;
+    setClientVal(v);
+    if (touched.has("client")) setError("client", validateClientName(v));
+  }
+
+  function onExpiresChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const v = e.target.value;
+    setExpiresVal(v);
+    if (touched.has("expires")) setError("expires", validateExpires(v));
+  }
+
+  function onNoteChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
+    const v = e.target.value;
+    setNoteVal(v);
+    if (touched.has("note")) setError("note", validateNote(v));
+  }
+
+  function onPassphraseChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const v = e.target.value;
+    setPassphraseVal(v);
+    if (touched.has("passphrase")) setError("passphrase", validatePassphrase(v, password));
+  }
+
+  // ── Blur handlers ──────────────────────────────────────────────────────────
+
+  function onTitleBlur() {
+    touch("title");
+    setError("title", validateTitle(titleVal));
+  }
+  function onClientBlur() {
+    touch("client");
+    setError("client", validateClientName(clientVal));
+  }
+  function onExpiresBlur() {
+    touch("expires");
+    setError("expires", validateExpires(expiresVal));
+  }
+  function onNoteBlur() {
+    touch("note");
+    setError("note", validateNote(noteVal));
+  }
+  function onPassphraseBlur() {
+    touch("passphrase");
+    setError("passphrase", validatePassphrase(passphraseVal, password));
+  }
+
   // ── Cover image selection ──────────────────────────────────────────────────
 
   function handleCoverChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
     setCoverFile(file);
-    // Generate a local object URL for the preview
     setCoverPreview(URL.createObjectURL(file));
   }
 
@@ -88,14 +233,22 @@ export default function NewGalleryPage() {
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
 
-    const form = e.currentTarget;
-    const title = (form.elements.namedItem("title") as HTMLInputElement).value.trim();
-    const clientName = (form.elements.namedItem("client") as HTMLInputElement).value.trim();
+    // Touch all fields so all errors become visible
+    const allFields = ["title", "client", "expires", "note", "passphrase"] as const;
+    setTouched(new Set(allFields));
 
-    if (!title) {
-      setStatus({ state: "error", message: "Gallery title is required." });
-      return;
-    }
+    // Run all validators at once
+    const newErrors: FieldErrors = {
+      title: validateTitle(titleVal),
+      client: validateClientName(clientVal),
+      expires: validateExpires(expiresVal),
+      note: validateNote(noteVal),
+      passphrase: validatePassphrase(passphraseVal, password),
+    };
+    setErrors(newErrors);
+
+    const hasErrors = Object.values(newErrors).some(Boolean);
+    if (hasErrors) return;
 
     setStatus({ state: "loading", step: "Creating gallery…" });
 
@@ -113,8 +266,8 @@ export default function NewGalleryPage() {
 
       // 2. Insert the gallery row — select the new ID back
       const insert: GalleryInsert = {
-        title,
-        client_name: clientName || null,
+        title: titleVal.trim(),
+        client_name: clientVal.trim() || null,
         user_id: user.id,
       };
 
@@ -193,24 +346,48 @@ export default function NewGalleryPage() {
       <form
         id="new-gallery-form"
         onSubmit={handleSubmit}
+        noValidate
         className="grid grid-cols-1 gap-14 lg:grid-cols-[minmax(0,1fr)_360px]"
       >
         <div className="space-y-10">
           <fieldset className="space-y-6" disabled={isLoading || isSuccess}>
             <legend className="eyebrow text-muted-foreground">Details</legend>
+
+            {/* Gallery title */}
             <div>
               <label className="eyebrow text-muted-foreground" htmlFor="title">
-                Gallery title
+                Gallery title <span className="text-destructive" aria-hidden>*</span>
               </label>
               <input
                 id="title"
                 name="title"
-                required
+                value={titleVal}
+                onChange={onTitleChange}
+                onBlur={onTitleBlur}
                 placeholder="e.g. Harlow &amp; Finn — Coastal Wedding"
-                className="mt-3 w-full border-b border-hairline bg-transparent pb-3 text-2xl font-display focus:border-foreground focus:outline-none"
+                aria-required="true"
+                aria-invalid={!!visibleError("title")}
+                aria-describedby={visibleError("title") ? "title-error" : undefined}
+                className={`mt-3 w-full border-b bg-transparent pb-3 text-2xl font-display focus:outline-none transition-colors ${
+                  visibleError("title")
+                    ? "border-destructive focus:border-destructive"
+                    : "border-hairline focus:border-foreground"
+                }`}
               />
+              <div className="flex items-start justify-between gap-4">
+                <FieldError message={visibleError("title")} />
+                <span
+                  className={`ml-auto mt-1.5 shrink-0 text-xs ${
+                    titleVal.length > 110 ? "text-destructive" : "text-muted-foreground/60"
+                  }`}
+                >
+                  {titleVal.length}/120
+                </span>
+              </div>
             </div>
+
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+              {/* Client name */}
               <div>
                 <label className="eyebrow text-muted-foreground" htmlFor="client">
                   Client name
@@ -218,10 +395,22 @@ export default function NewGalleryPage() {
                 <input
                   id="client"
                   name="client"
+                  value={clientVal}
+                  onChange={onClientChange}
+                  onBlur={onClientBlur}
                   placeholder="Harlow Vance"
-                  className="mt-3 w-full border border-hairline bg-background px-4 py-3 text-sm focus:border-foreground focus:outline-none"
+                  aria-invalid={!!visibleError("client")}
+                  aria-describedby={visibleError("client") ? "client-error" : undefined}
+                  className={`mt-3 w-full border bg-background px-4 py-3 text-sm focus:outline-none transition-colors ${
+                    visibleError("client")
+                      ? "border-destructive focus:border-destructive"
+                      : "border-hairline focus:border-foreground"
+                  }`}
                 />
+                <FieldError message={visibleError("client")} />
               </div>
+
+              {/* Expiration date */}
               <div>
                 <label className="eyebrow text-muted-foreground" htmlFor="expires">
                   Expiration date
@@ -230,21 +419,53 @@ export default function NewGalleryPage() {
                   id="expires"
                   name="expires"
                   type="date"
-                  className="mt-3 w-full border border-hairline bg-background px-4 py-3 text-sm focus:border-foreground focus:outline-none"
+                  value={expiresVal}
+                  onChange={onExpiresChange}
+                  onBlur={onExpiresBlur}
+                  min={new Date().toISOString().split("T")[0]}
+                  aria-invalid={!!visibleError("expires")}
+                  aria-describedby={visibleError("expires") ? "expires-error" : undefined}
+                  className={`mt-3 w-full border bg-background px-4 py-3 text-sm focus:outline-none transition-colors ${
+                    visibleError("expires")
+                      ? "border-destructive focus:border-destructive"
+                      : "border-hairline focus:border-foreground"
+                  }`}
                 />
+                <FieldError message={visibleError("expires")} />
               </div>
             </div>
+
+            {/* Welcome note */}
             <div>
               <label className="eyebrow text-muted-foreground" htmlFor="note">
-                Welcome note (optional)
+                Welcome note <span className="text-muted-foreground/50">(optional)</span>
               </label>
               <textarea
                 id="note"
                 name="note"
                 rows={4}
+                value={noteVal}
+                onChange={onNoteChange}
+                onBlur={onNoteBlur}
                 placeholder="A few words your client will see when they open the gallery…"
-                className="mt-3 w-full border border-hairline bg-background px-4 py-3 text-sm focus:border-foreground focus:outline-none"
+                aria-invalid={!!visibleError("note")}
+                aria-describedby={visibleError("note") ? "note-error" : undefined}
+                className={`mt-3 w-full border bg-background px-4 py-3 text-sm focus:outline-none transition-colors resize-none ${
+                  visibleError("note")
+                    ? "border-destructive focus:border-destructive"
+                    : "border-hairline focus:border-foreground"
+                }`}
               />
+              <div className="flex items-start justify-between gap-4">
+                <FieldError message={visibleError("note")} />
+                <span
+                  className={`ml-auto mt-1.5 shrink-0 text-xs ${
+                    noteVal.length > 720 ? "text-destructive" : "text-muted-foreground/60"
+                  }`}
+                >
+                  {noteVal.length}/800
+                </span>
+              </div>
             </div>
           </fieldset>
 
@@ -255,14 +476,38 @@ export default function NewGalleryPage() {
                 label="Password protection"
                 description="Require clients to enter a passphrase before viewing the gallery."
                 value={password}
-                onChange={setPassword}
+                onChange={(v) => {
+                  setPassword(v);
+                  // Re-validate passphrase whenever the toggle changes
+                  if (touched.has("passphrase")) {
+                    setError("passphrase", validatePassphrase(passphraseVal, v));
+                  }
+                  // Clear passphrase error when turning protection off
+                  if (!v) setError("passphrase", undefined);
+                }}
               />
               {password && (
-                <input
-                  name="passphrase"
-                  placeholder="Set a passphrase"
-                  className="mb-6 w-full border border-hairline bg-background px-4 py-3 text-sm focus:border-foreground focus:outline-none"
-                />
+                <div className="mb-6">
+                  <label className="sr-only" htmlFor="passphrase">Passphrase</label>
+                  <input
+                    id="passphrase"
+                    name="passphrase"
+                    type="password"
+                    value={passphraseVal}
+                    onChange={onPassphraseChange}
+                    onBlur={onPassphraseBlur}
+                    placeholder="Set a passphrase (min. 4 characters)"
+                    aria-required="true"
+                    aria-invalid={!!visibleError("passphrase")}
+                    aria-describedby={visibleError("passphrase") ? "passphrase-error" : undefined}
+                    className={`w-full border bg-background px-4 py-3 text-sm focus:outline-none transition-colors ${
+                      visibleError("passphrase")
+                        ? "border-destructive focus:border-destructive"
+                        : "border-hairline focus:border-foreground"
+                    }`}
+                  />
+                  <FieldError message={visibleError("passphrase")} />
+                </div>
               )}
               <Toggle
                 label="Allow downloads"
