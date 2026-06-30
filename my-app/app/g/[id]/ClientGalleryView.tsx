@@ -41,6 +41,32 @@ export function ClientGalleryView({
     });
   };
 
+  /**
+   * Force-download a photo via our /api/download proxy.
+   *
+   * The HTML `download` attribute is ignored for cross-origin URLs (browser
+   * security). Photos live on Supabase's CDN domain, so we proxy them through
+   * our own server which adds Content-Disposition: attachment.
+   */
+  async function handleDownload(src: string, name: string) {
+    try {
+      const params = new URLSearchParams({ url: src, name });
+      const res = await fetch(`/api/download?${params.toString()}`);
+      if (!res.ok) throw new Error("Download failed");
+      const blob = await res.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = blobUrl;
+      a.download = name;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(blobUrl);
+    } catch (err) {
+      console.error("[download]", err);
+    }
+  }
+
   const lightboxPhoto = photos.find((p) => p.id === lightbox);
 
   return (
@@ -115,13 +141,12 @@ export function ClientGalleryView({
                     >
                       {fav ? "♥ Favorited" : "♡ Favorite"}
                     </button>
-                    <a
-                      href={photo.src}
-                      download={photo.name}
-                      className="pointer-events-auto bg-background px-3 py-1.5 text-xs text-foreground"
+                    <button
+                      onClick={() => handleDownload(photo.src, photo.name)}
+                      className="pointer-events-auto bg-background px-3 py-1.5 text-xs text-foreground hover:bg-foreground hover:text-background transition-colors"
                     >
                       Download
-                    </a>
+                    </button>
                   </div>
                   {fav && (
                     <span className="absolute right-3 top-3 bg-foreground px-2 py-1 text-[10px] text-background">

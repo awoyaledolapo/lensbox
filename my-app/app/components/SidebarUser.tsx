@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 
@@ -18,7 +19,11 @@ export function SidebarUser() {
   const [initials, setInitials] = useState("··");
   const [showModal, setShowModal] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
+  // Portal requires the DOM — only render it after mount to avoid SSR mismatch.
+  const [mounted, setMounted] = useState(false);
   const router = useRouter();
+
+  useEffect(() => { setMounted(true); }, []);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -95,14 +100,15 @@ export function SidebarUser() {
         </button>
       </div>
 
-      {/* Logout confirmation modal */}
-      {showModal && (
+      {/* Logout confirmation modal — rendered via portal so it always sits
+          above every stacking context, regardless of which page is active. */}
+      {showModal && mounted && createPortal(
         <div
           id="logout-modal-backdrop"
           role="dialog"
           aria-modal="true"
           aria-labelledby="logout-modal-title"
-          className="fixed inset-0 z-50 flex items-center justify-center"
+          className="fixed inset-0 z-[9999] flex items-center justify-center"
           style={{ animation: "modalFadeIn 0.18s cubic-bezier(0.22,1,0.36,1) both" }}
           onClick={(e) => {
             if (e.target === e.currentTarget) setShowModal(false);
@@ -197,7 +203,8 @@ export function SidebarUser() {
               to   { opacity: 1; transform: translateY(0)   scale(1);    }
             }
           `}</style>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );

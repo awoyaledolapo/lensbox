@@ -14,6 +14,7 @@
  */
 
 import { useCallback, useRef, useState } from "react";
+import type { RefObject } from "react";
 import type { UploadItem } from "@/lib/types/photo";
 
 // ─── Props ────────────────────────────────────────────────────────────────────
@@ -23,6 +24,12 @@ interface PhotoUploaderProps {
   userId: string;
   /** Called after every batch completes (success or partial failure). */
   onUploadComplete: () => void;
+  /**
+   * Optional external ref attached to the hidden file input.
+   * Lets a parent component programmatically trigger the file picker
+   * (e.g. by calling `inputRef.current?.click()`).
+   */
+  inputRef?: RefObject<HTMLInputElement | null>;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -127,11 +134,14 @@ export function PhotoUploader({
   galleryId,
   userId,
   onUploadComplete,
+  inputRef: externalInputRef,
 }: PhotoUploaderProps) {
   const [items, setItems] = useState<UploadItem[]>([]);
   const [isDragOver, setIsDragOver] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const internalInputRef = useRef<HTMLInputElement>(null);
+  // Use the external ref when provided, otherwise fall back to the internal one.
+  const inputRef = externalInputRef ?? internalInputRef;
 
   // ── State helpers ──────────────────────────────────────────────────────────
 
@@ -300,7 +310,7 @@ export function PhotoUploader({
       </div>
 
       <input
-        ref={inputRef}
+        ref={inputRef as RefObject<HTMLInputElement>}
         id="photo-upload-input"
         type="file"
         accept="image/*"

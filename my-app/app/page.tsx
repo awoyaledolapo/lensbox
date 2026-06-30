@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import { WordMark } from "@/app/components/WordMark";
+import { getAuthUser } from "@/lib/supabase/server";
 import hero1 from "../public/hero-1.jpg";
 import hero2 from "../public/hero-2.jpg";
 import hero3 from "../public/hero-3.jpg";
@@ -108,7 +109,21 @@ const tiers = [
   },
 ];
 
-export default function Page() {
+export default async function Page() {
+  // Server-side auth check — drives all smart CTAs on this page.
+  const user = await getAuthUser();
+  const isLoggedIn = !!user;
+
+  // Navbar CTAs
+  const navGhostLabel = isLoggedIn ? "My galleries" : "Open studio";
+  const navGhostHref  = isLoggedIn ? "/galleries"  : "/login";
+  const navCtaLabel   = isLoggedIn ? "Open studio"  : "Start free";
+  const navCtaHref    = isLoggedIn ? "/galleries"   : "/signup";
+
+  // Pricing section — Starter tier
+  const starterCtaLabel = isLoggedIn ? "Open studio" : "Start free";
+  const starterCtaHref  = isLoggedIn ? "/galleries"  : "/login";
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       {/* Nav */}
@@ -123,16 +138,16 @@ export default function Page() {
           </ul>
           <div className="flex items-center gap-3">
             <a
-              href="/dashboard"
+              href={navGhostHref}
               className="hidden text-sm hover:opacity-60 sm:inline"
             >
-              Open studio
+              {navGhostLabel}
             </a>
             <a
-              href="/dashboard"
+              href={navCtaHref}
               className="border border-foreground px-4 py-2 text-sm transition-colors hover:bg-foreground hover:text-background"
             >
-              Start free
+              {navCtaLabel}
             </a>
           </div>
         </nav>
@@ -343,14 +358,14 @@ export default function Page() {
                   ))}
                 </ul>
                 <a
-                  href="#"
+                  href={t.name === "Starter" ? starterCtaHref : "#"}
                   className={`mt-10 inline-flex items-center justify-center px-6 py-3 text-sm transition-colors ${
                     t.featured
                       ? "bg-foreground text-background hover:opacity-90"
                       : "border border-foreground hover:bg-foreground hover:text-background"
                   }`}
                 >
-                  {t.cta}
+                  {t.name === "Starter" ? starterCtaLabel : t.cta}
                 </a>
               </div>
             ))}

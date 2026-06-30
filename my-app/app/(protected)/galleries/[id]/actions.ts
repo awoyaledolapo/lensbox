@@ -1,7 +1,9 @@
 "use server";
 
+import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { setGalleryPublic } from "@/lib/services/gallery.service";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 /**
  * Server Action: toggle whether a gallery is publicly accessible via /g/[id].
@@ -23,4 +25,27 @@ export async function toggleGalleryAccess(
   revalidatePath("/galleries");
 
   return { success: true };
+}
+
+/**
+ * Server Action: permanently delete a gallery and all its photos.
+ * Redirects to /galleries on success.
+ */
+export async function deleteGallery(
+  galleryId: string
+): Promise<{ success: boolean; error?: string }> {
+  const supabase = await createSupabaseServerClient();
+
+  const { error } = await supabase
+    .from("galleries")
+    .delete()
+    .eq("id", galleryId);
+
+  if (error) {
+    console.error("[actions] deleteGallery:", error.message);
+    return { success: false, error: error.message };
+  }
+
+  revalidatePath("/galleries");
+  redirect("/galleries");
 }

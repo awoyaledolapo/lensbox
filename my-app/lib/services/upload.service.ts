@@ -279,3 +279,75 @@ export async function uploadCoverPhoto(
   return { success: true, coverUrl: urlData.signedUrl };
 }
 
+// ─── Delete photo ─────────────────────────────────────────────────────────────
+
+export type DeletePhotoResult =
+  | { success: true }
+  | { success: false; error: string };
+
+/**
+ * Extracts the storage object path from a Supabase signed URL.
+ *
+ * Supabase signed URL format:
+ *   https://<project>.supabase.co/storage/v1/sign/<bucket>/<path...>?token=...
+ *
+ * We need the portion after /sign/<bucket>/ — i.e., the object key inside the bucket.
+ */
+function extractStoragePath(signedUrl: string): string | null {
+  try {
+    const url = new URL(signedUrl);
+    const marker = `/sign/${BUCKET}/`;
+    const idx = url.pathname.indexOf(marker);
+    if (idx === -1) return null;
+    return decodeURIComponent(url.pathname.slice(idx + marker.length));
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Deletes a photo from Supabase Storage and removes its row from `photos`.
+ *
+ * Strategy:
+ *  1. Extract the storage path from the signed URL stored in the DB row.
+ *  2. Remove the storage object — non-fatal if already gone (we still clean up the DB row).
+ *  3. Delete the `photos` row — fatal on failure (orphaned row would keep photo visible).
+ *
+ * RLS: uses the browser Supabase client so all policies are enforced with the
+ * current user's session.
+ */
+export async function deletePhoto(photo: Photo): Promise<DeletePhotoResult> {
+  // 1. Derive the storage path from the signed URL.
+  const storagePath = extractStoragePath(photo.image_url);
+
+  if (storagePath) {
+    // 2. Remove from storage. Log but don't fail if the object is already gone.
+    const { error: storageError } = await supabase.storage
+      .from(BUCKET)
+      .remove([storagePath]);
+
+    if (storageError) {
+      console.warn(
+        "[upload.service] deletePhoto storage remove (non-fatal):",
+        storageError.message
+      );
+    }
+  } else {
+    console.warn(
+      "[upload.service] deletePhoto: could not extract storage path — skipping storage delete."
+    );
+  }
+
+  // 3. Delete the photos row.
+  const { error: dbError } = await supabase
+    .from("photos")
+    .delete()
+    .eq("id", photo.id);
+
+  if (dbError) {
+    console.error("[upload.service] deletePhoto DB delete:", dbError.message);
+    return { success: false, error: dbError.message };
+  }
+
+  return { success: true };
+}

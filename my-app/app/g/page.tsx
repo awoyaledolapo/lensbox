@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { AppShell, PrimaryButton, GhostButton } from "@/app/components/AppShell";
+import { getAuthUser } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
   title: "Pricing — LensBox",
@@ -12,7 +13,6 @@ const tiers = [
     price: "$0",
     blurb: "Try LensBox with your next client gallery.",
     features: ["2 active galleries", "5 GB storage", "Password protection", "LensBox subdomain"],
-    cta: "Start free",
   },
   {
     name: "Pro",
@@ -45,7 +45,15 @@ const tiers = [
   },
 ];
 
-export default function PricingPage() {
+export default async function PricingPage() {
+  // Check auth server-side — no client JS, no hydration flash.
+  const user = await getAuthUser();
+  const isLoggedIn = !!user;
+
+  // Free tier CTA changes based on whether the user already has an account.
+  const freeCta = isLoggedIn ? "Open studio" : "Start free";
+  const freeHref = isLoggedIn ? "/galleries" : "/sign-up";
+
   return (
     <AppShell
       eyebrow="Plans"
@@ -58,41 +66,47 @@ export default function PricingPage() {
       </p>
 
       <div className="mt-14 grid grid-cols-1 gap-6 md:grid-cols-3">
-        {tiers.map((t) => (
-          <div
-            key={t.name}
-            className={`flex flex-col border p-8 lg:p-10 ${
-              t.featured ? "border-foreground" : "border-hairline"
-            }`}
-          >
-            <div className="flex items-center justify-between">
-              <h2 className="font-display text-2xl">{t.name}</h2>
-              {t.featured && <span className="eyebrow">Most chosen</span>}
+        {tiers.map((t) => {
+          // Free tier gets the smart CTA; others stay as-is.
+          const ctaLabel = t.name === "Free" ? freeCta : (t.cta ?? "Get started");
+          const ctaHref  = t.name === "Free" ? freeHref : "/galleries/new";
+
+          return (
+            <div
+              key={t.name}
+              className={`flex flex-col border p-8 lg:p-10 ${
+                t.featured ? "border-foreground" : "border-hairline"
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <h2 className="font-display text-2xl">{t.name}</h2>
+                {t.featured && <span className="eyebrow">Most chosen</span>}
+              </div>
+              <div className="mt-8 flex items-baseline gap-2">
+                <span className="font-display text-5xl">{t.price}</span>
+                {t.price !== "$0" && (
+                  <span className="text-sm text-muted-foreground">/ month</span>
+                )}
+              </div>
+              <p className="mt-4 text-sm text-muted-foreground">{t.blurb}</p>
+              <ul className="mt-8 space-y-3 text-sm">
+                {t.features.map((f) => (
+                  <li key={f} className="flex gap-3 border-t border-hairline pt-3">
+                    <span className="text-muted-foreground">—</span>
+                    <span>{f}</span>
+                  </li>
+                ))}
+              </ul>
+              <div className="mt-10">
+                {t.featured ? (
+                  <PrimaryButton href={ctaHref}>{ctaLabel}</PrimaryButton>
+                ) : (
+                  <GhostButton href={ctaHref}>{ctaLabel}</GhostButton>
+                )}
+              </div>
             </div>
-            <div className="mt-8 flex items-baseline gap-2">
-              <span className="font-display text-5xl">{t.price}</span>
-              {t.price !== "$0" && (
-                <span className="text-sm text-muted-foreground">/ month</span>
-              )}
-            </div>
-            <p className="mt-4 text-sm text-muted-foreground">{t.blurb}</p>
-            <ul className="mt-8 space-y-3 text-sm">
-              {t.features.map((f) => (
-                <li key={f} className="flex gap-3 border-t border-hairline pt-3">
-                  <span className="text-muted-foreground">—</span>
-                  <span>{f}</span>
-                </li>
-              ))}
-            </ul>
-            <div className="mt-10">
-              {t.featured ? (
-                <PrimaryButton href="/galleries/new">{t.cta}</PrimaryButton>
-              ) : (
-                <GhostButton href="/galleries/new">{t.cta}</GhostButton>
-              )}
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       <section className="mt-20 border-t border-hairline pt-14">

@@ -5,6 +5,7 @@ import { getGalleryById } from "@/lib/services/gallery.service";
 import { getAuthUser } from "@/lib/supabase/server";
 import { GalleryDetailClient } from "./GalleryDetailClient";
 import { ShareAccessSection } from "./ShareAccessSection";
+import { DeleteGalleryButton } from "./DeleteGalleryButton";
 
 // ─── Metadata ─────────────────────────────────────────────────────────────────
 
@@ -94,12 +95,7 @@ export default async function GalleryDetailPage({
               Permanently removes the gallery and all its photos. This cannot be undone.
             </p>
           </div>
-          <button
-            type="button"
-            className="inline-flex items-center justify-center border border-foreground/40 px-4 py-2 text-sm text-muted-foreground transition-colors hover:border-foreground hover:text-foreground"
-          >
-            Delete
-          </button>
+          <DeleteGalleryButton galleryId={gallery.id} />
         </div>
       </section>
     </AppShell>
